@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
-import "./JeuneLayout.css";
+import "./jeuneLayout.css";
 import "./LiveViewer.css";
 
 export default function JeuneLayout() {
