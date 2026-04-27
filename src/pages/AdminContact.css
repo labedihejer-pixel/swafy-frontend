@@ -1,0 +1,154 @@
+.admin-contact {
+  display: flex;
+  height: 100vh;
+  background: #f7f8fc;
+  font-family: "Segoe UI";
+}
+
+/* LEFT PANEL */
+.contacts-panel {
+  width: 260px;
+  background: white;
+  padding: 20px;
+  border-right: 1px solid #e5e5e5;
+}
+
+.contacts-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.contact-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 70px;
+  padding: 10px;
+  background: #fafafa;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.contact-btn:hover {
+  transform: scale(1.1);
+  background: #f0f0f0;
+}
+
+.chat-list {
+  margin-top: 20px;
+}
+
+.chat-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.chat-item:hover,
+.chat-item.active {
+  background: #ece9ff;
+}
+
+/* MIDDLE CHAT */
+.chat-window {
+  flex: 1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
+  margin-bottom: 15px;
+  border: 1px solid #eee;
+}
+
+.chat-messages {
+  flex: 1;
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 15px;
+  border: 1px solid #eee;
+  overflow-y: auto;
+}
+
+.incoming,
+.outgoing {
+  padding: 10px 14px;
+  border-radius: 12px;
+  max-width: 70%;
+  margin-bottom: 10px;
+}
+
+.incoming {
+  background: #ece9ff;
+  align-self: flex-start;
+}
+
+.outgoing {
+  background: #d6f7d9;
+  align-self: flex-end;
+}
+
+.chat-input {
+  display: flex;
+  position: relative;
+}
+
+.chat-input textarea {
+  width: 100%;
+  border-radius: 12px;
+  padding: 15px 50px 15px 15px;
+  border: 1px solid #ccc;
+  resize: none;
+  height: 60px;
+}
+
+.input-actions {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  gap: 10px;
+}
+
+.send-btn {
+  font-size: 25px;
+  color: #6b4fbb;
+  cursor: pointer;
+}
+
+.emoji-btn {
+  font-size: 22px;
+  color: #333;
+  cursor: pointer;
+}
+
+/* RIGHT SETTINGS */
+.settings-panel {
+  width: 250px;
+  background: white;
+  padding: 20px;
+  border-left: 1px solid #e5e5e5;
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
