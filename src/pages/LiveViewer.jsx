@@ -16,51 +16,51 @@ export default function LiveViewer() {
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
 
-  // ✅ Socket
   useEffect(() => {
-    if (!roomCode || !token) return;
+  if (!roomCode || !token) return;
 
-    socket.current = io(SOCKET_URL);
+  socket.current = io(SOCKET_URL);
 
-    socket.current.emit("join-room", {
-      roomCode,
-      userName: "Viewer",
-    });
+  socket.current.emit("join-room", {
+    roomCode,
+    userName: "Viewer",
+    role: "guest",           // ✅ lazem ykon "guest"
+    accessToken: token,      // ✅ هذا هو اللي كان ناقص
+  }, (ack) => {
+    // ✅ backend يرد — نشوفو قبل el ack كان مقبول ولا لا
+    if (!ack?.ok) {
+      console.error("❌ Socket refusé:", ack?.message);
+      // يمكنك تعمل redirect هنا
+    }
+  });
 
-    socket.current.on("receive-message", (msg) => {
-      setMessages((prev) => [...prev, msg]);
-    });
+  socket.current.on("receive-message", (msg) => {
+    setMessages((prev) => [...prev, msg]);
+  });
 
-    return () => {
-      socket.current?.off("receive-message");
-      socket.current?.disconnect();
-    };
-  }, [roomCode, token]);
+  return () => {
+    socket.current?.off("receive-message");
+    socket.current?.disconnect();
+  };
+}, [roomCode, token]);
 
   // ✅ Auto scroll
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // ✅ Send
-  const sendMessage = () => {
-    if (!chatInput.trim()) return;
+ const sendMessage = () => {
+  if (!chatInput.trim() || !socket.current || !roomCode) return;
 
-    const localMsg = {
-      user: "Viewer",
-      text: chatInput,
-      time: new Date().toLocaleTimeString(),
-    };
+  socket.current.emit("send-message", {
+    roomCode,
+    message: chatInput,
+  });
 
-    setMessages((prev) => [...prev, localMsg]);
+  setChatInput("");
+};
 
-    socket.current.emit("send-message", {
-      roomCode,
-      message: chatInput,
-    });
 
-    setChatInput("");
-  };
 
   return (
     <div className="lv-page">

@@ -29,10 +29,18 @@ export default function AdminLiveStream() {
   const [recordTime, setRecordTime] = useState(0);
   const [showChat, setShowChat] = useState(true);
  
-  useEffect(() => {
+ useEffect(() => {
   if (!liveCode || !hostAccessToken) return;
 
-  socket.current = io(SOCKET_URL);
+  if (!socket.current) {
+    socket.current = io(SOCKET_URL, {
+      transports: ["websocket"],
+    });
+
+    socket.current.on("receive-message", (msg) => {
+      setMessages((prev) => [...prev, msg]);
+    });
+  }
 
   socket.current.emit("join-room", {
     roomCode: liveCode,
@@ -41,15 +49,11 @@ export default function AdminLiveStream() {
     accessToken: hostAccessToken,
   });
 
-  socket.current.on("receive-message", (msg) => {
-    setMessages((prev) => [...prev, msg]);
-  });
-
   return () => {
     socket.current?.off("receive-message");
-    socket.current?.disconnect();
   };
 }, [liveCode, hostAccessToken]);
+
 
 
   // ✅ Refs
@@ -64,25 +68,20 @@ export default function AdminLiveStream() {
   // ════════════════════════════════════════
   // ✅ Création / rotation session sécurisée
   // ════════════════════════════════════════
-  const createSecureSession = async (rotate = false) => {
+ const createSecureSession = async () => {
   try {
-    setSessionLoading(true);
-
     const res = await API.post(
       "/lives/session/create",
       { liveId: recentLive.id }
     );
 
+    console.log("✅ SESSION CREATED:", res.data);
+
     setLiveCode(res.data.roomCode);
     setLiveLink(res.data.viewerLink);
     setHostAccessToken(res.data.hostAccessToken);
-    localStorage.setItem("currentLiveViewerLink", res.data.viewerLink);
-    setCopied(false);
   } catch (err) {
-    console.error(err);
-    alert("Erreur création live sécurisé");
-  } finally {
-    setSessionLoading(false);
+    console.error("❌ CREATE SESSION ERROR:", err);
   }
 };
 
@@ -210,44 +209,38 @@ useEffect(() => {
     }
   };
 
-  // ✅ End call → ferme aussi la session backend
   const endCall = async () => {
-    try {
-      if (liveCode) {
-        await API.post(`/lives/session/end/${liveCode}`);
-      }
-    } catch (err) {
-      console.error(err);
+  try {
+    if (liveCode) {
+      await API.post(`/lives/session/end/${liveCode}`);
     }
+  } catch (err) {
+    console.error(err);
+  }
 
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    screenStreamRef.current?.getTracks().forEach((t) => t.stop());
-    if (recIntervalRef.current) clearInterval(recIntervalRef.current);
-    navigate("/");
-  };
+  socket.current?.emit("leave-room");
+  socket.current?.disconnect();
+  socket.current = null;
+
+  streamRef.current?.getTracks().forEach((t) => t.stop());
+  screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+  if (recIntervalRef.current) clearInterval(recIntervalRef.current);
+
+  navigate("/");
+};
+
 const sendMessage = () => {
-  if (!chatInput.trim()) return;
-
-  const localMsg = {
-    user: user?.nom_user || "Moi",
-    text: chatInput,
-    time: new Date().toLocaleTimeString(),
-  };
-
-  // ✅ نضيفو message محليًا
-  setMessages((prev) => [...prev, localMsg]);
+  if (!chatInput.trim() || !socket.current || !liveCode) return;
 
   socket.current.emit("send-message", {
-  roomCode: liveCode,
-  message: chatInput,
-});
+    roomCode: liveCode,
+    message: chatInput,
+  });
 
   setChatInput("");
 };
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  
 
   const fmt = (s) => {
     const h = String(Math.floor(s / 3600)).padStart(2, "0");
@@ -275,8 +268,6 @@ const sendMessage = () => {
     </button>
   );
  
-
-
 
   // ════════════════════════════════════════
   // ✅ RENDER
