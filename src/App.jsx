@@ -1,11 +1,11 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-import Login from "./pages/Login";
+import Login from "./pages/login";
 import Register from "./pages/Register";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminLiveStream from "./pages/AdminLiveStream";
 import AdminContact from "./pages/AdminContact";
-import JeuneDashboard from "./pages/JeuneDashboard";
+import JeuneDashboard from "./pages/jeuneDashboard";
 import JeuneLayout from "./pages/JeuneLayout";
 import Swafy_Meet from "./pages/Swafy_Meet";
 import MeetRoom from "./pages/MeetRoom";
