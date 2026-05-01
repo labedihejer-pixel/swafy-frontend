@@ -10,7 +10,8 @@ import {
   isToday,
 } from "date-fns";
 import fr from "date-fns/locale/fr";
-import { ChevronLeft, ChevronRight, Pin, PinOff, Radio } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import "./CalendarPage.css";
 
 const CalendarPage = () => {
   const location = useLocation();
@@ -18,34 +19,58 @@ const CalendarPage = () => {
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState({});
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [showModal, setShowModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedCategory, setSelectedCategory] = useState("Tous");
 
-  const categories = [
-    { name: "Meeting", color: "#f59e0b" },
-    { name: "Event", color: "#ef4444" },
-    { name: "Task", color: "#3b82f6" },
-    { name: "Personal", color: "#10b981" },
-    { name: "Other", color: "#8b5cf6" },
-  ];
+  // Notes modal
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteTitle, setNoteTitle] = useState("");
+  const [noteText, setNoteText] = useState("");
+  // ✅ Notes par date
+  const [notes, setNotes] = useState({});
 
+  // ✅ Catégories (sans accent pour la logique)
+  const categories = ["Tous", "Live", "Enquete", "Evenement", "Personnel"];
+  const CATEGORY_CONFIG = {
+  Live: { label: "Live", color: "#3b82f6" },
+  Enquete: { label: "Enquête", color: "#f59e0b" },
+  Evenement: { label: "Événement", color: "#8b5cf6" },
+  Personnel: { label: "Personnel", color: "#10b981" },
+};
   // ===============================
-  // Fetch lives
+  // Fetch lives (SAFE)
   // ===============================
   useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      console.warn("No token, skip fetch lives");
+      setEvents({});
+      return;
+}
     const fetchLives = async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch("https://swafy-backend.onrender.com/api/lives", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch(
+          "https://swafy-backend.onrender.com/api/lives",
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        if (!res.ok) {
+          setEvents({});
+          return;
+        }
 
         const lives = await res.json();
+        if (!Array.isArray(lives)) {
+          setEvents({});
+          return;
+        }
+
         const newEvents = {};
 
         lives.forEach((live) => {
           if (!live.date) return;
-
           const key = format(new Date(live.date), "yyyy-MM-dd");
           if (!newEvents[key]) newEvents[key] = [];
 
@@ -53,17 +78,14 @@ const CalendarPage = () => {
             id: live.id,
             title: live.title,
             time: live.time,
-            thematique: live.thematique,
-            status: live.status || "Programmé",
-            isLive: true,
-            isPinned: false,
-            category: "Other",
+            category: "Live",
           });
         });
 
         setEvents(newEvents);
       } catch (err) {
-        console.error("Erreur chargement lives:", err);
+        console.error(err);
+        setEvents({});
       }
     };
 
@@ -77,145 +99,220 @@ const CalendarPage = () => {
   const monthEnd = endOfMonth(currentDate);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-  const getEventsForDay = (date) => {
-    const key = format(date, "yyyy-MM-dd");
-    return events[key] || [];
-  };
+  const eventsOfDay = () => {
+  const key = format(selectedDate, "yyyy-MM-dd");
 
-  const getCategoryColor = (name) =>
-    categories.find((c) => c.name === name)?.color || "#8b5cf6";
+  const liveEvents = (events[key] || []).map(e => ({
+  ...e,
+  color: CATEGORY_CONFIG[e.category]?.color,
+}));
+ const noteEvents = (notes[key] || []).map((n, i) => ({
+  id: `note-${i}`,
+  title: n.title,
+  time: "Note",
+  category: n.category,
+  color: CATEGORY_CONFIG[n.category]?.color,
+}));
+
+  const merged = [...liveEvents, ...noteEvents];
+
+  if (selectedCategory === "Tous") return merged;
+  return merged.filter((e) => e.category === selectedCategory);
+  };
 
   // ===============================
   // Render
   // ===============================
   return (
-    <div style={{ background: "#fff", padding: 20 }}>
-      <div style={{ maxWidth: 1300, margin: "0 auto" }}>
-        {/* Header */}
-        <div
-          style={{
-            background: "linear-gradient(to right,#9e7dec,#7c3aed)",
-            color: "white",
-            padding: 30,
-            borderRadius: 20,
-            marginBottom: 25,
-          }}
-        >
-          <h1 style={{ margin: 0 }}>
-            {format(currentDate, "MMMM yyyy", { locale: fr })}
-          </h1>
-          <p style={{ marginTop: 6 }}>
-            {format(currentDate, "EEEE dd MMMM yyyy", { locale: fr })}
-          </p>
+    <div className="calendar-layout">
+      {/* ===== CALENDRIER PRINCIPAL ===== */}
+      <div className="calendar-main">
+        <div className="calendar-header">
+          <div>
+            <h1>{format(currentDate, "MMMM yyyy", { locale: fr })}</h1>
+            <p>{format(new Date(), "EEEE dd MMMM yyyy", { locale: fr })}</p>
+          </div>
+
+
+          <div className="calendar-nav">
+            <button onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
+              <ChevronLeft />
+            </button>
+            <button onClick={() => setCurrentDate(new Date())}>
+              Aujourd’hui
+            </button>
+            <button onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
+              <ChevronRight />
+            </button>
+          </div>
         </div>
 
-        {/* Navigation */}
-        <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
-          <button onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
-            <ChevronLeft /> Mois précédent
-          </button>
-          <button onClick={() => setCurrentDate(new Date())}>Aujourd’hui</button>
-          <button onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
-            Mois suivant <ChevronRight />
-          </button>
-        </div>
-
-        {/* Grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(7,1fr)",
-            gap: 2,
-            background: "#e5e3f0",
-          }}
-        >
+        <div className="big-calendar">
           {days.map((day) => {
-            const dayEvents = getEventsForDay(day);
-            const hasLive = dayEvents.some((e) => e.isLive);
-            const pinned = dayEvents.some((e) => e.isPinned);
-
+            const key = format(day, "yyyy-MM-dd");
+            const hasEvent = (events[key] || []).length > 0;
             return (
-              <div
-                key={day.toISOString()}
-                onClick={() => {
-                  setSelectedDate(day);
-                  setShowModal(true);
-                }}
-                style={{
-                  background: "white",
-                  minHeight: 90,
-                  padding: 10,
-                  cursor: "pointer",
-                }}
-              >
-                {/* Day header */}
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontWeight: isToday(day) ? "700" : "500",
-                      color: isToday(day) ? "#6b46c1" : "#333",
-                    }}
-                  >
-                    {format(day, "d")}
-                  </span>
+             <div
+              key={key}
+             onClick={() => {
+              setSelectedDate(day);
 
-                  <div style={{ display: "flex", gap: 4 }}>
-                    {hasLive && <Radio size={14} color="#ef4444" />}
-                    {pinned && <Pin size={14} color="#f59e0b" />}
-                  </div>
-                </div>
+              const key = format(day, "yyyy-MM-dd");
+              const hasLive = (events[key] || []).length > 0;
+              const hasNote = (notes[key] || []).length > 0;
 
-                {/* Indicators */}
-                <div style={{ display: "flex", gap: 3, marginTop: 6 }}>
-                  {dayEvents.slice(0, 4).map((ev, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        width: ev.isLive ? 22 : 16,
-                        height: 5,
-                        background: getCategoryColor(ev.category),
-                        borderRadius: 10,
-                      }}
-                    />
-                  ))}
-                </div>
-                {dayEvents
-  .filter((e) => e.isLive)
-  .map((lv) => (
-    <div
-      key={lv.id}
-      onClick={(e) => {
-        e.stopPropagation();
-        navigate("/admin/live", {
-          state: { recentLive: lv },
-        });
-      }}
-      style={{
-        marginTop: 6,
-        fontSize: 11,
-        fontWeight: 600,
-        color: "#7c3aed",
-        background: "#ede9fe",
-        borderRadius: 6,
-        padding: "2px 6px",
-        cursor: "pointer",
-      }}
-    >
-      📡 {lv.title}
-    </div>
-))}
-
+              // ✅ إذا النهار فارغ → افتح modal مباشرة
+              if (!hasLive && !hasNote) {
+                setShowNoteModal(true);
+  }
+}}
+              className={`calendar-day ${
+                format(day, "yyyy-MM-dd") ===
+                format(selectedDate, "yyyy-MM-dd")
+                  ? "selected"
+                  : ""
+              }`}
+            >
+                <span className={isToday(day) ? "today" : ""}>
+                  {format(day, "d")}
+                </span>
+                {hasEvent && <div className="dot" />}
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* ===== PANNEAU DROIT ===== */}
+      <div className="calendar-panel">
+        {/* Choix date */}
+        <div className="panel-box">
+          <label> Choisir une date</label>
+          <input
+            type="date"
+            value={format(selectedDate, "yyyy-MM-dd")}
+            onChange={(e) => setSelectedDate(new Date(e.target.value))}
+          />
+        </div>
+       
+        {/* Catégories */}
+        <div className="panel-box">
+          <label>🏷 Catégories</label>
+          <div className="category-grid">
+            {categories.map((c) => (
+              <button
+                key={c}
+                className={selectedCategory === c ? "active" : ""}
+                onClick={() => setSelectedCategory(c)}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Liste événements */}
+        <div className="panel-box">
+          <label> Événements</label>
+          {eventsOfDay().length > 0 && (
+            <button
+              style={{ marginBottom: 10 }}
+              onClick={() => setShowNoteModal(true)}
+            >
+              ➕ Ajouter une note
+            </button>
+          )}
+
+          {eventsOfDay().map((ev) => (
+            <div
+              key={ev.id}
+              className="event-item"
+              onClick={() =>
+                navigate("/admin/live", { state: { recentLive: ev } })
+              }
+            >
+              <strong>{ev.title}</strong>
+              <span>{ev.time || "—"}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ===== MODAL NOTE ===== */}
+      {showNoteModal && (
+        <div className="note-overlay">
+          <div className="note-modal">
+            <h3>
+               Note –{" "}
+              {format(selectedDate, "dd MMMM yyyy", { locale: fr })}
+            </h3>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+            >
+              <option value="">-- Choisir une catégorie --</option>
+              <option value="Enquete">Enquête</option>
+              <option value="Evenement">Événement</option>
+              <option value="Personnel">Personnel</option>
+            </select>
+            <input
+            
+              type="text"
+              placeholder="Titre de la note"
+              value={noteTitle}
+              onChange={(e) => setNoteTitle(e.target.value)}
+            />
+
+            <textarea
+              placeholder="Écrire votre note ici..."
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+            />
+
+            <div className="note-actions">
+              <button
+                className="cancel"
+                onClick={() => {
+                  setShowNoteModal(false);
+                  setNoteTitle("");
+                  setNoteText("");
+                }}
+              >
+                Annuler
+              </button>
+
+              <button
+                className="confirm"
+                onClick={() => {
+                const key = format(selectedDate, "yyyy-MM-dd");
+                setNotes((prev) => ({
+                    ...prev,
+                    [key]: [
+                      ...(prev[key] || []),
+                     {
+                        title: noteTitle,
+                        text: noteText,
+                        category: selectedCategory,
+                      }
+                    ],
+                  }));
+
+                  setShowNoteModal(false);
+                  setNoteTitle("");
+                  setNoteText("");
+
+
+                  setShowNoteModal(false);
+                  setNoteTitle("");
+                  setNoteText("");
+                }}
+              >
+                Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

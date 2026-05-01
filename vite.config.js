@@ -4,9 +4,12 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: true,
-    allowedHosts: [
-      "finale-scalping-overstuff.ngrok-free.dev",
-    ],
+    proxy: {
+      "/api": {
+        target: "https://swafy-backend.onrender.com",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
 });

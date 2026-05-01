@@ -1,11 +1,11 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-import Login from "./pages/login";
+import Login from "./pages/Login";
 import Register from "./pages/Register";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminLiveStream from "./pages/AdminLiveStream";
 import AdminContact from "./pages/AdminContact";
-import JeuneDashboard from "./pages/jeuneDashboard";
+import JeuneDashboard from "./pages/JeuneDashboard";
 import JeuneLayout from "./pages/JeuneLayout";
 import Swafy_Meet from "./pages/Swafy_Meet";
 import MeetRoom from "./pages/MeetRoom";
@@ -13,23 +13,24 @@ import ArchivePage from "./pages/ArchivePage";
 import LiveViewer from "./pages/LiveViewer";
 import NewLive from "./pages/NewLive";
 import CalendarPage from "./pages/CalendarPage";
-
 import ProtectedRoute from "./components/ProtectedRoute";
+import ParametreContact from "./pages/ParametreContact";
+
+import PublierPage from "./pages/PublierPage";
+import PublicationDetail from "./pages/PublicationDetail";
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
 
-        {/* ✅ ROOT */}
+        {/* Public */}
         <Route path="/" element={<Login />} />
-
-        {/* ✅ Public */}
-        <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/live/:roomCode" element={<LiveViewer />} />
+        <Route path="/parametre-contact" element={<ParametreContact />} />
 
-        {/* ✅ Calendar */}
+        {/* Calendar */}
         <Route
           path="/calendar"
           element={
@@ -39,7 +40,7 @@ export default function App() {
           }
         />
 
-        {/* ✅ Meet */}
+        {/* Meet */}
         <Route
           path="/meet"
           element={
@@ -48,7 +49,6 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-
         <Route
           path="/meet/:roomCode"
           element={
@@ -58,7 +58,7 @@ export default function App() {
           }
         />
 
-        {/* ✅ Admin */}
+        {/* Admin */}
         <Route
           path="/admin"
           element={
@@ -86,6 +86,17 @@ export default function App() {
           }
         />
 
+
+         <Route
+          path="/admin/publications"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+
         <Route
           path="/archive"
           element={
@@ -95,7 +106,7 @@ export default function App() {
           }
         />
 
-        {/* ✅ Jeune */}
+        {/* Jeune */}
         <Route
           path="/jeune"
           element={
@@ -114,7 +125,7 @@ export default function App() {
           }
         />
 
-        {/* ✅ Create Live */}
+        {/* Create Live */}
         <Route
           path="/new-live"
           element={

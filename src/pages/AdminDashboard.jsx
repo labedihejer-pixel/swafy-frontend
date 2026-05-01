@@ -4,6 +4,10 @@ import NewLive from "./NewLive";
 import AdminLiveStream from "./AdminLiveStream";
 import Swafy_Meet from "./Swafy_Meet";
 import ArchivePage from "./ArchivePage";
+import ParametrePage from "./ParametrePage";
+import { useLang } from "../i18n/LanguageContext";
+import ParametreContact from "./ParametreContact";
+import PublierPage from "./PublierPage";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -21,6 +25,7 @@ import {
 import { Line, Bar, Doughnut } from "react-chartjs-2";
 import API from "../services/api";
 
+
 ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement,
   BarElement, ArcElement, Filler, Tooltip, Legend
@@ -29,8 +34,12 @@ ChartJS.register(
 export default function AdminDashboard() {
   const user = JSON.parse(localStorage.getItem("user"));
   const navigate = useNavigate();
+  const { t } = useLang();
  
   const [activePage, setActivePage] = useState("dashboard");
+  const [calSplash, setCalSplash] = useState(false);
+  const [archiveSplash, setArchiveSplash] = useState(false);
+  const [paramSplash, setParamSplash] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -44,12 +53,12 @@ export default function AdminDashboard() {
   const [addChartModal, setAddChartModal] = useState(false);
   const [confirmDel, setConfirmDel] = useState({ open: false, id: null, title: "" });
   const [newChart, setNewChart] = useState({ type: "line", title: "" });
-
+  
   const [charts, setCharts] = useState([
     {
       id: "chart-event",
       type: "line",
-      title: "Evenements par Gouvernaurat (par an)",
+      title: "Événements par Gouvernorat (par an)",
       keywords: "evenement Gouvernaurat tunisie annuel statistique",
       labels: [
         "Tunis","Ariana","Ben Arous","Manouba",
@@ -69,15 +78,7 @@ export default function AdminDashboard() {
         },
       ],
     },
-    {
-      id: "chart-bar", type: "bar", title: "Statistiques",
-      keywords: "statistique bar barre chart graphique analyse données",
-      labels: ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim","Lun","Mar","Mer","Jeu","Ven"],
-      datasets: [
-        { label:"Série 1", data:[65,59,80,81,56,55,40,70,62,75,85,60], color:"rgba(66,133,244,0.7)" },
-        { label:"Série 2", data:[45,40,60,55,42,48,35,50,45,55,65,45], color:"rgba(231,76,60,0.5)" },
-      ],
-    },
+   
     {
       id: "chart-donut", type: "doughnut", title: "Catégorie",
       subtitle: "From 1-6 Dec, 2021",
@@ -85,6 +86,28 @@ export default function AdminDashboard() {
       labels: ["etudiant","eleve","parent"],
       datasets: [{ data:[40,32,28], colors:["#4a5568","#7c5cbf","#ec4899"] }],
     },
+    {
+  id: "chart-enquete-satisfaction",
+  type: "line",
+  title: "Évolution de la satisfaction (Enquête)",
+  keywords: "enquete satisfaction evolution",
+  labels: [],
+  datasets: [
+    {
+      label: "Satisfaction moyenne",
+      data: [],
+      color: "#7c5cbf",
+      dashed: false,
+    },
+    {
+      label: "Nb réponses",
+      data: [],
+      color: "rgba(231,76,60,0.7)",
+      dashed: true,
+    },
+  ],
+},
+
   ]);
 
   const [statCards, setStatCards] = useState([
@@ -99,7 +122,29 @@ export default function AdminDashboard() {
       keywords:"nombre gouvernant vert admin", autoSync:false,
     },
   ]);
+  // ✅ FETCH STATS EVENEMENTS (من DB)
+const fetchGouvernoratStats = useCallback(async () => {
+  try {
+    const res = await API.get(`/events/stats-gouvernorat?year=${year}`);
 
+    const data = new Array(24).fill(0);
+
+    res.data.forEach((e) => {
+      const i = e.id_gouvernorat - 1;
+      if (i >= 0 && i < 24) data[i] = e.total;
+    });
+
+    setCharts((prev) =>
+      prev.map((c) =>
+        c.id === "chart-event"
+          ? { ...c, datasets: [{ ...c.datasets[0], data }] }
+          : c
+      )
+    );
+  } catch (err) {
+    console.error("❌ fetchGouvernoratStats error", err);
+  }
+}, [year]);
   const lastScrollY  = useRef(0);
   const prevDir      = useRef(null);
   const suggestTimer = useRef(null);
@@ -123,11 +168,12 @@ export default function AdminDashboard() {
     return () => document.head.removeChild(style);
   }, []);
 
+
   // ── Auto-sync participant count ──//
   useEffect(() => {
     const sync = async () => {
       try {
-        const res = await API.get("/users/count/jeune");
+       const res = await API.get("/users/count/jeune-profiles");
         if (res.data?.count != null) {
           setStatCards((p) =>
             p.map((c) => c.id === "stat-participant" ? { ...c, value: res.data.count } : c)
@@ -154,35 +200,68 @@ export default function AdminDashboard() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+  useEffect(() => {
+  if (activePage !== "calendrier") return;
+
+  setCalSplash(true);
+  const t = setTimeout(() => {
+    setCalSplash(false);
+  }, 2000);
+
+  return () => clearTimeout(t);
+}, [activePage]);
 
   // ── FETCH DES EVENEMENTS DEPUIS LA BASE DE DONNEES ──
-  const fetchWilayaStats = useCallback(async () => {
-    try {
-      const res = await API.get(`/events/stats-wilaya?year=${year}`);
-      const apiData = res.data;
-      const updatedData = new Array(24).fill(0);
-      apiData.forEach((item) => {
-        const index = item.id_gouvernorat - 1;
-        if (index >= 0 && index < 24) {
-          updatedData[index] = item.total;
-        }
-      });
-      setCharts((prevCharts) =>
-        prevCharts.map((chart) => {
-          if (chart.id === "chart-event") {
-            return { ...chart, datasets: [{ ...chart.datasets[0], data: updatedData }] };
-          }
-          return chart;
-        })
-      );
-    } catch (error) {
-      console.error("Erreur chargement stats:", error);
-    }
-  }, [year]);
+  // ── Chargement des statistiques des événements par gouvernorat ──
+ const fetchEnqueteSatisfaction = useCallback(async () => {
+  console.log("🔥 fetchEnqueteSatisfaction CALLED");
 
-  useEffect(() => {
-    fetchWilayaStats();
-  }, [fetchWilayaStats]);
+  setCharts((prev) =>
+    prev.map((chart) =>
+      chart.id === "chart-enquete-satisfaction"
+        ? {
+            ...chart,
+            labels: ["Jan", "Feb", "Mar", "Apr"],
+            datasets: [
+              { ...chart.datasets[0], data: [5, 4, 3, 4] },
+              { ...chart.datasets[1], data: [2, 3, 1, 4] },
+            ],
+          }
+        : chart
+    )
+  );
+}, []);
+
+// ✅ events من DB
+useEffect(() => {
+  fetchGouvernoratStats();
+}, [fetchGouvernoratStats]);
+
+// ✅ enquête test
+useEffect(() => {
+  fetchEnqueteSatisfaction();
+}, [fetchEnqueteSatisfaction]);
+useEffect(() => {
+  if (activePage !== "archive") return;
+
+  setArchiveSplash(true);
+  const t = setTimeout(() => {
+    setArchiveSplash(false);
+  }, 2000);
+
+  return () => clearTimeout(t);
+}, [activePage]);
+
+useEffect(() => {
+  if (activePage !== "parametre") return;
+
+  setParamSplash(true);
+  const t = setTimeout(() => {
+    setParamSplash(false);
+  }, 2000);
+
+  return () => clearTimeout(t);
+}, [activePage]);
 
   // ── Toast ──
   const toast = useCallback((msg, type = "success") => {
@@ -286,45 +365,70 @@ const openAddData = (chart) => {
   console.log("targetId:", targetId);
   console.log("data:", data);
 
+  // ✅ 1) الحالة الخاصة: إضافة Event للـ chart-event
   if (targetId === "chart-event" && mode === "add-data") {
     try {
       const payload = {
         titre_evenement: data.titre_evenement,
-        id_gouvernorat: data.id_gouvernorat,
+        id_gouvernorat: data.id_gouvernorat ?? 1,
         date_evenement: data.date_evenement,
+        id_user: user?.id_user || user?.id || user?.userId,
       };
 
-      console.log("📤 Payload à envoyer:", payload);
+      console.log("📤 Payload à envoyer :", JSON.stringify(payload, null, 2));
 
-      if (!payload.titre_evenement?.trim() || !payload.date_evenement) {
-        toast("❌ Titre et date sont obligatoires.", "error");
+      if (
+        !payload.titre_evenement?.trim() ||
+        !payload.id_gouvernorat ||
+        !payload.date_evenement
+      ) {
+        toast("❌ Tous les champs sont obligatoires.", "error");
         return;
       }
 
-      const response = await API.post("/events", payload);
-      console.log("✅ Réponse backend:", response.data);
+      const token = localStorage.getItem("token");
 
-      toast("✅ Événement enregistré dans la base de données !");
-      await fetchWilayaStats();
+      const response = await API.post("/events", payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      console.log("✅ Réponse backend :", response.data);
+
+      toast("✅ Événement ajouté avec succès !");
+      await fetchGouvernoratStats();
       closeModal();
+      return; // ✅ مهم برشا باش ما يكملش لباقي الحالات
     } catch (error) {
-      console.error("❌ Erreur complète:", error);
-      console.error("❌ Response:", error.response?.data);
-      toast("❌ Erreur: " + (error.response?.data?.message || error.message), "error");
+      console.error("❌ Erreur ajout événement :", {
+        message: error.message,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
+
+      toast(
+        error.response?.data?.message ||
+          "❌ Erreur serveur lors de l'ajout de l'événement",
+        "error"
+      );
+      return; // ✅ زادة مهم
     }
-    return;
   }
 
-  // باقي الحالات
+  // ✅ 2) باقي الحالات: تعديل stat
   if (mode === "edit-stat" && targetId?.startsWith("stat-")) {
     setStatCards((p) =>
-      p.map((s) => (s.id === targetId ? { ...s, label: data.label, value: parseInt(data.value, 10) || 0 } : s))
+      p.map((s) =>
+        s.id === targetId
+          ? { ...s, label: data.label, value: parseInt(data.value, 10) || 0 }
+          : s
+      )
     );
     toast("✅ Stat modifié");
     closeModal();
     return;
   }
 
+  // ✅ 3) تعديل chart / إضافة data للـ charts العاديين
   if ((mode === "edit-chart" || mode === "add-data") && targetId) {
     setCharts((p) => p.map((c) => (c.id === targetId ? data : c)));
     toast("✅ Diagramme mis à jour");
@@ -332,6 +436,7 @@ const openAddData = (chart) => {
     return;
   }
 
+  // ✅ fallback
   closeModal();
 };
   const closeModal = () => setEditModal({ open:false, mode:"", targetId:null, data:{} });
@@ -467,34 +572,33 @@ const openAddData = (chart) => {
       }
     }
   };
-
   const Comp = { line:Line, bar:Bar, doughnut:Doughnut };
 
-  // ══════════════════════════════════════════
+  
   //   NAV ITEMS — مع NewLive مضاف
-  // ══════════════════════════════════════════
- const navItems = [
-  { key:"accueil",      icon:"", label:"Accueil" },
-  { key:"dashboard",    icon:"", label:"Tableau de bord" },
-  { key:"messages",     icon:"", label:"Messages", },
-  { key:"publier",      icon:"", label:"Publier" },
-  { key:"calendrier",   icon:"", label:"Calendrier" },
-  { key:"swafyMeet",    icon:"", label:"Swafy Meet" },
-  { key:"live",         icon:"", label:"Live ", isLive:true },
-  { key:"participant",  icon:"", label:"Participant"},
-  { key:"notification", icon:"", label:"Notification" },
-  { key:"archive",      icon:"", label:"Archive" },
-  { key:"parametre",    icon:"", label:"Parametre" },
+  
+const navItems = [
+  { key:"accueil",      label: t("accueil") },
+  { key:"dashboard",    label: t("dashboard") },
+  { key:"messages",     label: t("messages") },
+  { key:"publier",      label: t("publier") },
+  { key:"calendrier",   label: t("calendrier") },
+  { key:"swafyMeet",    label: "Swafy Meet" }, // اسم خاص نخليه
+  { key:"live",         label: t("live"), isLive:true },
+  { key:"participant",  label: t("participants") },
+  { key:"notification", label: t("notifications") },
+  { key:"archive",      label: t("archive") },
+  { key:"parametre",    label: t("parametre") },
 ];
 
   // ── Empty pages ──
-  const emptyPages = {
-    accueil:      { icon:"🏠", title:"Accueil",       desc:"Bienvenue sur Swafy ! Votre plateforme de gestion intelligente." },
-    publier:      { icon:"➕", title:"Publier",        desc:"Créez et publiez du nouveau contenu." },
-    participant:  { icon:"👥", title:"Participants",   desc:"Gérez les participants inscrits." },
-    notification: { icon:"🔔", title:"Notifications",  desc:"Consultez vos notifications." },
-    parametre:    { icon:"⚙️", title:"Paramètres",     desc:"Configurez vos préférences." },
-  };
+ const emptyPages = {
+  accueil:      { icon:"🏠" },
+  publier:      { icon:"➕" },
+  participant:  { icon:"👥" },
+  notification: { icon:"🔔" },
+  parametre:    { icon:"⚙️" },
+};
 
   // ── Helpers ──
   const cardStyle = (id, kw, extra = {}) => {
@@ -532,10 +636,19 @@ const openAddData = (chart) => {
   const firstChart = charts[0] || null;
   const restCharts = charts.slice(1);
 
-  // ══════════════════════════════════════════
-  //   الصفحات الكاملة (تاخذ كل المساحة)
-  // ══════════════════════════════════════════
-  const fullPages = ["calendrier", "messages", "newlive","live","swafyMeet","archieve"];
+  
+  const fullPages = [
+  "calendrier",
+  "messages",
+  "publier",
+  "newlive",
+  "live",
+  "swafyMeet",
+  "archive",
+  "parametre" ,
+  "parametreContact"
+];
+
   const isFullPage = fullPages.includes(activePage);
 
   /* ════════════════════════════════════════
@@ -588,23 +701,52 @@ const openAddData = (chart) => {
           ))}
         </div>
 
-        <button style={S.exitBtn} onClick={logout}>🚪 Exit</button>
+        <button style={S.exitBtn} onClick={logout}> {t("logout")}</button>
       </aside>
-
-      {/* ══════════════════════════════════
-           CALENDRIER PAGE
-      ══════════════════════════════════ */}
       {activePage === "calendrier" && (
-        <div style={{
-          marginLeft: sidebarVisible ? 240 : 0,
-          transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
-          minHeight: "100vh",
-          background: "#f8f7fc",
-          padding: "30px 40px",
-        }}>
-          <CalendarPage />
+  <>
+    {calSplash && (
+      <>
+        <style>{`
+          .cal-splash {
+            position: fixed;
+            inset: 0;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+          }
+          .cal-splash img {
+            width: 150px;
+            animation: calAnim 2s ease forwards;
+          }
+          @keyframes calAnim {
+            0% { transform: scale(.6); opacity: 0; }
+            25% { transform: scale(1); opacity: 1; }
+            75% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(.9); opacity: 0; }
+          }
+        `}</style>
+        <div className="cal-splash">
+         <img src={`/calendrier.png?v=${Date.now()}`} alt="calendrier" />
         </div>
-      )}
+      </>
+    )}
+
+    <div
+      style={{
+        marginLeft: sidebarVisible ? 240 : 0,
+        transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
+        minHeight: "100vh",
+        background: "#f8f7fc",
+        padding: "30px 40px",
+      }}
+    >
+      <CalendarPage />
+    </div>
+  </>
+)}
 
       {/* ══════════════════════════════════
            MESSAGES PAGE
@@ -615,7 +757,7 @@ const openAddData = (chart) => {
           transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
           minHeight: "100vh",
         }}>
-          <AdminContact />
+         <AdminContact setActivePage={setActivePage} />
         </div>
       )}
 
@@ -670,23 +812,120 @@ const openAddData = (chart) => {
     <Swafy_Meet onNouvelleReunion={() => setActivePage("newlive")} />
   </div>
 )}
-{/* ══════════════════════════════════
-     ARCHIVE PAGE ✅
-══════════════════════════════════ */}
 {activePage === "archive" && (
+  <>
+    {archiveSplash && (
+      <>
+        <style>{`
+          .archive-splash {
+            position: fixed;
+            inset: 0;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+          }
+          .archive-splash img {
+            width: 150px;
+            animation: splashAnim 2s ease forwards;
+          }
+        `}</style>
+        <div className="archive-splash">
+          <img src={`/archive.png?v=${Date.now()}`} alt="archive" />
+        </div>
+      </>
+    )}
+
+    <div
+      style={{
+        marginLeft: sidebarVisible ? 240 : 0,
+        transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
+        minHeight: "100vh",
+        background: "#f8f7fc",
+        padding: "30px 40px",
+      }}
+    >
+      <ArchivePage />
+    </div>
+  </>
+)}
+{activePage === "parametre" && (
+  <>
+    {paramSplash && (
+      <>
+        <style>{`
+          .param-splash {
+            position: fixed;
+            inset: 0;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+          }
+          .param-splash img {
+            width: 150px;
+            animation: splashAnim 2s ease forwards;
+          }
+          @keyframes splashAnim {
+            0% { transform: scale(.6); opacity: 0; }
+            25% { transform: scale(1); opacity: 1; }
+            75% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(.9); opacity: 0; }
+          }
+        `}</style>
+        <div className="param-splash">
+          <img src={`/parametre.png?v=${Date.now()}`} alt="parametre" />
+        </div>
+      </>
+    )}
+
+    <div
+      style={{
+        marginLeft: sidebarVisible ? 240 : 0,
+        transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
+        minHeight: "100vh",
+        background: "#f6f5ff",
+      }}
+    >
+      <ParametrePage />
+    </div>
+  </>
+)}
+{activePage === "parametreContact" && (
+  <div
+    style={{
+      marginLeft: sidebarVisible ? 240 : 0,
+      transition: "margin-left .5s",
+      minHeight: "100vh",
+      background: "#f8f7fc",
+    }}
+  >
+    <ParametreContact onBack={() => setActivePage("messages")} />
+  </div>
+)}
+{/* ══════════════════════════════════
+     P U B L I E R   P A G E ✅
+══════════════════════════════════ */}
+{activePage === "publier" && (
   <div
     style={{
       marginLeft: sidebarVisible ? 240 : 0,
       transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
       minHeight: "100vh",
       background: "#f8f7fc",
-      padding: "30px 40px",
     }}
   >
-    <ArchivePage />
+    <PublierPage
+      onSuccess={() => {
+        toast("✅ Publication créée avec succès !");
+        setActivePage("dashboard"); // ولا "messages" ولا وين تحب
+      }}
+      onCancel={() => setActivePage("dashboard")}
+    />
   </div>
 )}
-
       {/* ══════════════════════════════════
            EMPTY PAGES
       ══════════════════════════════════ */}
@@ -699,8 +938,8 @@ const openAddData = (chart) => {
           transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
         }}>
           <div style={S.emptyIco}>{emptyPages[activePage].icon}</div>
-          <h2 style={S.emptyH}>{emptyPages[activePage].title}</h2>
-          <p style={S.emptyP}>{emptyPages[activePage].desc}</p>
+         <h2 style={S.emptyH}>{t(activePage)}</h2>
+         <p style={S.emptyP}>{t(`${activePage}_desc`)}</p>
         </div>
       )}
 
@@ -1103,13 +1342,13 @@ const S = {
   navList:{ flex:1, padding:"10px 14px", overflowY:"auto", display:"flex", flexDirection:"column", gap:3 },
   navItem:{
     display:"flex", alignItems:"center", gap:14, padding:"12px 18px", borderRadius:12,
-    border:"none", background:"transparent", color:"rgba(255,255,255,.85)", fontSize:13.5,
+    border:"none", background:"transparent", color:"rgba(255, 255, 255, 0.85)", fontSize:13.5,
     fontWeight:500, cursor:"pointer", textAlign:"left", width:"100%",
     fontFamily:"'Poppins',sans-serif", transition:"all .25s ease",
   },
   navActive:{ background:"rgba(255,255,255,.22)", color:"#fff", fontWeight:700, boxShadow:"inset 3px 0 0 #fff" },
   badge:{ marginLeft:"auto", background:"#e74c3c", color:"#fff", fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:10 },
-  liveBadge:{ background:"#e74c3c", color:"#fff", fontSize:9, fontWeight:800, padding:"2px 6px", borderRadius:4 },
+  liveBadge:{ background:"#e74c3c", color:"#120404", fontSize:9, fontWeight:800, padding:"2px 6px", borderRadius:4 },
   exitBtn:{
     margin:"10px 14px 20px", padding:"12px 18px", borderRadius:12,
     border:"1px solid rgba(255,255,255,.15)", background:"rgba(255,255,255,.06)",
