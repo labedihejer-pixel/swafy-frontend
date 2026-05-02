@@ -8,6 +8,7 @@ import ParametrePage from "./ParametrePage";
 import { useLang } from "../i18n/LanguageContext";
 import ParametreContact from "./ParametreContact";
 import PublierPage from "./PublierPage";
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -48,7 +49,7 @@ export default function AdminDashboard() {
   const [period, setPeriod] = useState("7");
   const [toasts, setToasts] = useState([]);
   const toastId = useRef(0);
-
+  const [participantCount, setParticipantCount] = useState(0);
   const [editModal, setEditModal] = useState({ open: false, mode: "", targetId: null, data: {} });
   const [addChartModal, setAddChartModal] = useState(false);
   const [confirmDel, setConfirmDel] = useState({ open: false, id: null, title: "" });
@@ -78,7 +79,6 @@ export default function AdminDashboard() {
         },
       ],
     },
-   
     {
       id: "chart-donut", type: "doughnut", title: "Catégorie",
       subtitle: "From 1-6 Dec, 2021",
@@ -112,7 +112,7 @@ export default function AdminDashboard() {
 
   const [statCards, setStatCards] = useState([
     {
-      id:"stat-participant", label:"Nombre participant", value:4000,
+      id:"stat-participant", label:"Nombre participant", value:0,
       gradient:"linear-gradient(135deg,#3498db,#2980b9)",
       keywords:"nombre participant nbr jeune bleu users", autoSync:true,
     },
@@ -168,23 +168,32 @@ const fetchGouvernoratStats = useCallback(async () => {
     return () => document.head.removeChild(style);
   }, []);
 
+ // ── Update Stat Card when participantCount changes ──
+useEffect(() => {
+  setStatCards((prev) =>
+    prev.map((card) =>
+      card.id === "stat-participant"
+        ? { ...card, value: participantCount }
+        : card
+    )
+  );
+}, [participantCount]);
 
-  // ── Auto-sync participant count ──//
-  useEffect(() => {
-    const sync = async () => {
-      try {
-       const res = await API.get("/users/count/jeune-profiles");
-        if (res.data?.count != null) {
-          setStatCards((p) =>
-            p.map((c) => c.id === "stat-participant" ? { ...c, value: res.data.count } : c)
-          );
-        }
-      } catch {}
-    };
-    sync();
-    const interval = setInterval(sync, 30000);
-    return () => clearInterval(interval);
-  }, []);
+ useEffect(() => {
+  const sync = async () => {
+    try {
+      const res = await API.get("/users/count/jeune-profiles");
+      if (res.data?.count != null) {
+       setParticipantCount(res.data.count); 
+       console.log("✅ participantCount =", res.data.count);// ✅ المصدر الوحيد
+      }
+    } catch {}
+  };
+
+  sync();
+  const interval = setInterval(sync, 30000);
+  return () => clearInterval(interval);
+}, []);
 
   // ── Scroll → sidebar hide/show ──
   useEffect(() => {
@@ -262,7 +271,23 @@ useEffect(() => {
 
   return () => clearTimeout(t);
 }, [activePage]);
-
+useEffect(() => {
+  setCharts(prev =>
+    prev.map(chart =>
+      chart.id === "chart-donut"
+        ? {
+            ...chart,
+            datasets: [
+              {
+                ...chart.datasets[0],
+                data: [participantCount, 0, 0], // مثال
+              },
+            ],
+          }
+        : chart
+    )
+  );
+}, [participantCount]);
   // ── Toast ──
   const toast = useCallback((msg, type = "success") => {
     const id = ++toastId.current;
@@ -285,13 +310,14 @@ useEffect(() => {
       navigate("/");
     }, 800);
   };
-
+  
   // ── Search ──
   const allSearchable = [
     ...charts.map((c) => ({
       id: c.id, label: c.title, kw: c.keywords,
       icon: c.type === "line" ? "📈" : c.type === "bar" ? "📊" : "🍩",
     })),
+    
     ...statCards.map((s) => ({
       id: s.id, label: `${s.label} (${s.value.toLocaleString()})`,
       kw: s.keywords, icon: "💳",
