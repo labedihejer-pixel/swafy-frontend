@@ -5,7 +5,7 @@ import Register from "./pages/Register";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminLiveStream from "./pages/AdminLiveStream";
 import AdminContact from "./pages/AdminContact";
-import JeuneDashboard from "./pages/temp";
+import JeuneDashboard from "./pages/JeuneDashborad";
 import JeuneLayout from "./pages/JeuneLayout";
 import Swafy_Meet from "./pages/Swafy_Meet";
 import MeetRoom from "./pages/MeetRoom";
